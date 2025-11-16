@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Threats - LureNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Threat Analysis</h1>
+    <p class="page-subtitle">Detailed view of all detected threats and attack attempts</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>All Threats</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Source IP</th>
+                        <th>Attack Type</th>
+                        <th>Protocol</th>
+                        <th>Path/Target</th>
+                        <th>Severity</th>
+                        <th>Threat Score</th>
+                        <th>Indicators</th>
+                    </tr>
+                </thead>
+                <tbody id="all-threats-table">
+                    <tr>
+                        <td colspan="8" class="text-center">Loading threats...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function loadThreats() {
+        fetch('/api/events?limit=100')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('all-threats-table');
+
+                if (!data.events || data.events.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No threats detected yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.events.map(event => `
+                    <tr>
+                        <td>${new Date(event.timestamp).toLocaleString()}</td>
+                        <td><code>${event.source_ip}</code></td>
+                        <td>${event.attack_type || 'Unknown'}</td>
+                        <td><span class="badge">${event.protocol || 'http'}</span></td>
+                        <td>${event.path || '-'}</td>
+                        <td><span class="severity-badge severity-${event.severity}">${event.severity || 'low'}</span></td>
+                        <td>${(event.threat_score || 0).toFixed(1)}</td>
+                        <td>${(event.detected_tools || []).join(', ') || 'None'}</td>
+                    </tr>
+                `).join('');
+            })
+            .catch(err => console.error('Error loading threats:', err));
+    }
+
+    // Initial load and refresh
+    loadThreats();
+    setInterval(loadThreats, 5000);
+</script>
+{% endblock %}

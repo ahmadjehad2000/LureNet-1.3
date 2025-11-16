@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LureNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Threat Intelligence Dashboard</h1>
+    <p class="page-subtitle">Real-time honeypot monitoring and threat analysis</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon bg-blue">⚔️</div>
+        <div class="stat-content">
+            <div class="stat-label">Total Threats</div>
+            <div class="stat-value" id="total-threats">0</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-red">👤</div>
+        <div class="stat-content">
+            <div class="stat-label">Unique Attackers</div>
+            <div class="stat-value" id="unique-attackers">0</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-yellow">⚠️</div>
+        <div class="stat-content">
+            <div class="stat-label">High Severity</div>
+            <div class="stat-value" id="high-severity">0</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-green">✓</div>
+        <div class="stat-content">
+            <div class="stat-label">Services Running</div>
+            <div class="stat-value" id="services-running">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Attack Distribution</h3>
+        </div>
+        <div class="card-body">
+            <canvas id="protocol-chart"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Severity Levels</h3>
+        </div>
+        <div class="card-body">
+            <canvas id="severity-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Threats</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP Address</th>
+                        <th>Attack Type</th>
+                        <th>Protocol</th>
+                        <th>Severity</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody id="threats-table">
+                    <tr>
+                        <td colspan="6" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Fetch and update statistics
+    function updateDashboard() {
+        fetch('/api/statistics')
+            .then(res => res.json())
+            .then(data => {
+                // Update stats
+                document.getElementById('total-threats').textContent = data.total_events || 0;
+                document.getElementById('unique-attackers').textContent = data.unique_ips || 0;
+                document.getElementById('high-severity').textContent =
+                    (data.severity_distribution?.high || 0) + (data.severity_distribution?.critical || 0);
+
+                // Update charts
+                updateProtocolChart(data.protocol_distribution || {});
+                updateSeverityChart(data.severity_distribution || {});
+            })
+            .catch(err => console.error('Error loading stats:', err));
+
+        // Fetch recent events
+        fetch('/api/events?limit=10')
+            .then(res => res.json())
+            .then(data => {
+                updateEventsTable(data.events || []);
+            })
+            .catch(err => console.error('Error loading events:', err));
+
+        // Fetch service status
+        fetch('/api/services/status')
+            .then(res => res.json())
+            .then(data => {
+                const running = Object.values(data.services || {}).filter(v => v).length;
+                document.getElementById('services-running').textContent = running;
+            })
+            .catch(err => console.error('Error loading service status:', err));
+    }
+
+    function updateEventsTable(events) {
+        const tbody = document.getElementById('threats-table');
+
+        if (events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No threats detected yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = events.map(event => `
+            <tr>
+                <td>${new Date(event.timestamp).toLocaleString()}</td>
+                <td><code>${event.source_ip}</code></td>
+                <td>${event.attack_type || 'Unknown'}</td>
+                <td><span class="badge">${event.protocol || 'http'}</span></td>
+                <td><span class="severity-badge severity-${event.severity}">${event.severity || 'low'}</span></td>
+                <td>${(event.threat_score || 0).toFixed(1)}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Initialize charts
+    let protocolChart, severityChart;
+
+    function updateProtocolChart(data) {
+        const ctx = document.getElementById('protocol-chart');
+        const labels = Object.keys(data);
+        const values = Object.values(data);
+
+        if (protocolChart) protocolChart.destroy();
+
+        protocolChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    function updateSeverityChart(data) {
+        const ctx = document.getElementById('severity-chart');
+        const severityOrder = ['low', 'medium', 'high', 'critical'];
+        const values = severityOrder.map(s => data[s] || 0);
+
+        if (severityChart) severityChart.destroy();
+
+        severityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: severityOrder,
+                datasets: [{
+                    label: 'Count',
+                    data: values,
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7f1d1d']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // Initial load and refresh every 5 seconds
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
+
+    // Socket.IO real-time updates
+    socket.on('stats_update', (data) => {
+        console.log('Real-time stats update:', data);
+        // Update UI with new data
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - LureNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Threat Analytics</h1>
+    <p class="page-subtitle">Advanced analytics and top attackers</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Top Attackers</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Total Events</th>
+                        <th>Max Threat Score</th>
+                        <th>Country</th>
+                    </tr>
+                </thead>
+                <tbody id="attackers-table">
+                    <tr>
+                        <td colspan="4" class="text-center">Loading attackers...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function loadAnalytics() {
+        fetch('/api/statistics')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('attackers-table');
+                const attackers = data.top_attackers || [];
+
+                if (attackers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No attacker data yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = attackers.map(attacker => `
+                    <tr>
+                        <td><code>${attacker.ip}</code></td>
+                        <td>${attacker.events}</td>
+                        <td>${(attacker.threat_score || 0).toFixed(1)}</td>
+                        <td>${attacker.country || 'Unknown'}</td>
+                    </tr>
+                `).join('');
+            })
+            .catch(err => console.error('Error loading analytics:', err));
+    }
+
+    loadAnalytics();
+    setInterval(loadAnalytics, 5000);
+</script>
+{% endblock %}

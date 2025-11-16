@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Services - LureNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Service Monitoring</h1>
+    <p class="page-subtitle">Monitor honeypot services status</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon bg-blue">🔧</div>
+        <div class="stat-content">
+            <div class="stat-label">Total Services</div>
+            <div class="stat-value" id="total-services">0</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon bg-green">✓</div>
+        <div class="stat-content">
+            <div class="stat-label">Running</div>
+            <div class="stat-value" id="running-services">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Service Status</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="services-table">
+                    <tr>
+                        <td colspan="2" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function loadServices() {
+        fetch('/api/services/status')
+            .then(res => res.json())
+            .then(data => {
+                const services = data.services || {};
+                const running = Object.values(services).filter(v => v).length;
+                const total = Object.keys(services).length;
+
+                document.getElementById('total-services').textContent = total;
+                document.getElementById('running-services').textContent = running;
+
+                const tbody = document.getElementById('services-table');
+                tbody.innerHTML = Object.entries(services).map(([name, status]) => `
+                    <tr>
+                        <td><strong>${name.toUpperCase()}</strong></td>
+                        <td>
+                            <span class="severity-badge severity-${status ? 'low' : 'high'}">
+                                ${status ? 'RUNNING' : 'STOPPED'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            })
+            .catch(err => console.error('Error loading services:', err));
+    }
+
+    loadServices();
+    setInterval(loadServices, 5000);
+</script>
+{% endblock %}

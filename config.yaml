@@ -1,0 +1,141 @@
+# LureNet Enterprise Configuration
+# Professional Honeypot Platform
+
+# Global Settings
+global:
+  name: "LureNet"
+  version: "2.0.0"
+  debug: false
+  log_level: "INFO"
+  data_dir: "data"
+  max_connections: 1000
+
+# Database Configuration
+database:
+  type: "sqlite"
+  path: "data/lurenet.db"
+  max_events: 100000
+  retention_days: 90
+  auto_cleanup: true
+
+# Web Dashboard
+dashboard:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5000
+  secret_key: "change-this-in-production"
+  session_timeout: 3600
+  admin_username: "admin"
+  admin_password: "LureNet2024!"  # Change this!
+
+# Honeypot Services
+services:
+  http:
+    enabled: true
+    port: 8080
+    host: "0.0.0.0"
+    banner: "Apache/2.4.52 (Ubuntu)"
+    fake_paths:
+      - "/admin"
+      - "/login"
+      - "/wp-admin"
+      - "/phpmyadmin"
+      - "/config"
+    vulnerabilities:
+      - "sql_injection"
+      - "xss"
+      - "path_traversal"
+      - "command_injection"
+
+  ssh:
+    enabled: true
+    port: 2222
+    host: "0.0.0.0"
+    banner: "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"
+    fake_users:
+      - "root"
+      - "admin"
+      - "ubuntu"
+      - "user"
+    max_attempts: 3
+
+  ftp:
+    enabled: true
+    port: 2121
+    host: "0.0.0.0"
+    banner: "220 ProFTPD Server (LureNet FTP)"
+    anonymous_login: true
+    fake_files:
+      - "readme.txt"
+      - "config.xml"
+      - "backup.tar.gz"
+
+  smtp:
+    enabled: true
+    port: 2525
+    host: "0.0.0.0"
+    banner: "220 mail.lurenet.local ESMTP Postfix"
+    accept_all: true
+
+  dns:
+    enabled: true
+    port: 10053
+    host: "0.0.0.0"
+    fake_domains:
+      - "lurenet.local"
+      - "admin.lurenet.local"
+      - "mail.lurenet.local"
+
+  smb:
+    enabled: true
+    port: 4445
+    host: "0.0.0.0"
+    fake_shares:
+      - "Users"
+      - "Public"
+      - "Admin$"
+      - "C$"
+      - "IPC$"
+
+  ldap:
+    enabled: true
+    port: 3389
+    host: "0.0.0.0"
+    domain: "dc=lurenet,dc=local"
+    fake_users:
+      - "Administrator"
+      - "Guest"
+      - "krbtgt"
+      - "Domain Admins"
+
+# Threat Intelligence
+intelligence:
+  enabled: true
+  geo_ip: true
+  ip_reputation: true
+  malware_analysis: true
+  correlation: true
+  auto_block: false
+  severity_threshold: 7.0
+
+# Notifications
+notifications:
+  enabled: false
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    username: ""
+    password: ""
+    recipient: ""
+  slack:
+    enabled: false
+    webhook_url: ""
+
+# Logging
+logging:
+  level: "INFO"
+  file: "data/logs/lurenet.log"
+  max_size_mb: 100
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
