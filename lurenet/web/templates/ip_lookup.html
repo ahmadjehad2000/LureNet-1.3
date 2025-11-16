@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}IP Lookup - LureNet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">IP Reputation & Geolocation</h1>
+    <p class="page-subtitle">Lookup IP addresses for geolocation, reputation, and threat intelligence</p>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>IP Address Lookup</h3>
+        </div>
+        <div class="card-body">
+            <form id="ip-form">
+                <div class="form-group">
+                    <label for="ip-input" class="form-label">IP Address</label>
+                    <input type="text" id="ip-input" class="form-input" placeholder="Enter IP address..." required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>Lookup IP</span>
+                </button>
+            </form>
+            <div id="ip-result" style="margin-top: 1.5rem;"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Attacker IPs</h3>
+        </div>
+        <div class="card-body">
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                Recent attackers detected by honeypots
+            </p>
+            <div id="attacker-ips" class="loading"><div class="loading-spinner"></div></div>
+        </div>
+    </div>
+</div>
+
+<div id="detailed-results"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Load attacker IPs
+    fetch('/api/attacker/ips')
+        .then(res => res.json())
+        .then(data => {
+            const ipsDiv = document.getElementById('attacker-ips');
+            if (data.ips && data.ips.length > 0) {
+                let html = '<div style="max-height: 400px; overflow-y: auto;">';
+                data.ips.slice(0, 20).forEach(ip => {
+                    html += `<div style="padding: 0.5rem; background: rgba(15, 23, 42, 0.5); border-radius: 0.375rem; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.1)'" onmouseout="this.style.background='rgba(15, 23, 42, 0.5)'" onclick="lookupIP('${ip}')">`;
+                    html += `<code style="color: var(--primary-light);">${ip}</code>`;
+                    html += `</div>`;
+                });
+                html += '</div>';
+                ipsDiv.innerHTML = html;
+            } else {
+                ipsDiv.innerHTML = '<div style="color: var(--text-muted);">No attackers detected yet</div>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('attacker-ips').innerHTML = '<div class="alert alert-error">Failed to load attackers</div>';
+        });
+
+    // IP lookup form
+    document.getElementById('ip-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const ip = document.getElementById('ip-input').value.trim();
+        await lookupIP(ip);
+    });
+
+    async function lookupIP(ip) {
+        const resultDiv = document.getElementById('ip-result');
+        resultDiv.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+        // Set the input field
+        document.getElementById('ip-input').value = ip;
+
+        try {
+            const response = await fetch('/api/ip/lookup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ip: ip})
+            });
+
+            const result = await response.json();
+            displayIPResult(result);
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+        }
+    }
+
+    function displayIPResult(result) {
+        const resultDiv = document.getElementById('ip-result');
+        const detailedDiv = document.getElementById('detailed-results');
+
+        let html = '<div style="padding: 1rem; background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem;">';
+
+        html += `<div style="margin-bottom: 1rem;">
+            <span class="severity-badge severity-${result.verdict === 'malicious' ? 'critical' : result.verdict === 'suspicious' ? 'high' : 'low'}">
+                ${result.verdict.toUpperCase().replace('_', ' ')}
+            </span>
+            <span style="margin-left: 1rem; color: var(--text-secondary);">Threat Score: ${result.threat_score}/100</span>
+        </div>`;
+
+        html += `<div><strong>IP Address:</strong> <code>${result.ip}</code></div>`;
+        html += '</div>';
+        resultDiv.innerHTML = html;
+
+        // Detailed results
+        let detailedHtml = '<div class="card" style="margin-top: 1.5rem;">';
+        detailedHtml += '<div class="card-header"><h3>Detailed Information</h3></div>';
+        detailedHtml += '<div class="card-body">';
+        detailedHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">';
+
+        // Geolocation
+        if (result.geolocation && Object.keys(result.geolocation).length > 0) {
+            const geo = result.geolocation;
+            detailedHtml += '<div>';
+            detailedHtml += '<h4 style="color: var(--primary); margin-bottom: 1rem;">Geolocation</h4>';
+            detailedHtml += '<table style="width: 100%; color: var(--text-secondary); font-size: 0.875rem;">';
+            if (geo.country) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Country:</strong></td><td>${geo.country} (${geo.country_code})</td></tr>`;
+            if (geo.city) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>City:</strong></td><td>${geo.city}</td></tr>`;
+            if (geo.region) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Region:</strong></td><td>${geo.region}</td></tr>`;
+            if (geo.timezone) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Timezone:</strong></td><td>${geo.timezone}</td></tr>`;
+            if (geo.latitude && geo.longitude) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Coordinates:</strong></td><td>${geo.latitude}, ${geo.longitude}</td></tr>`;
+            detailedHtml += '</table>';
+            detailedHtml += '</div>';
+        }
+
+        // Network Info
+        if (result.geolocation && (result.geolocation.isp || result.geolocation.asn)) {
+            const geo = result.geolocation;
+            detailedHtml += '<div>';
+            detailedHtml += '<h4 style="color: var(--primary); margin-bottom: 1rem;">Network Information</h4>';
+            detailedHtml += '<table style="width: 100%; color: var(--text-secondary); font-size: 0.875rem;">';
+            if (geo.isp) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>ISP:</strong></td><td>${geo.isp}</td></tr>`;
+            if (geo.organization) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Organization:</strong></td><td>${geo.organization}</td></tr>`;
+            if (geo.asn) detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>ASN:</strong></td><td>${geo.asn}</td></tr>`;
+            detailedHtml += '</table>';
+            detailedHtml += '</div>';
+        }
+
+        // Threat Indicators
+        detailedHtml += '<div>';
+        detailedHtml += '<h4 style="color: var(--primary); margin-bottom: 1rem;">Threat Indicators</h4>';
+        detailedHtml += '<table style="width: 100%; color: var(--text-secondary); font-size: 0.875rem;">';
+        detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>VPN:</strong></td><td>${result.is_vpn ? '⚠ Yes' : 'No'}</td></tr>`;
+        detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Proxy:</strong></td><td>${result.is_proxy ? '⚠ Yes' : 'No'}</td></tr>`;
+        detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Tor:</strong></td><td>${result.is_tor ? '⚠ Yes' : 'No'}</td></tr>`;
+        detailedHtml += `<tr><td style="padding: 0.5rem 0;"><strong>Hosting:</strong></td><td>${result.geolocation?.is_hosting ? '⚠ Yes' : 'No'}</td></tr>`;
+        detailedHtml += '</table>';
+        detailedHtml += '</div>';
+
+        // Reputation
+        if (result.reputation && result.reputation.sources) {
+            detailedHtml += '<div>';
+            detailedHtml += '<h4 style="color: var(--primary); margin-bottom: 1rem;">Reputation</h4>';
+
+            const threats = result.reputation.threat_lists || [];
+            if (threats.length > 0) {
+                detailedHtml += '<div style="padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.5rem; margin-bottom: 0.5rem;">';
+                detailedHtml += '<strong style="color: #fca5a5;">Listed in Threat Feeds:</strong><br>';
+                detailedHtml += '<ul style="margin: 0.5rem 0 0 1.5rem; color: var(--text-secondary); font-size: 0.875rem;">';
+                threats.forEach(t => {
+                    detailedHtml += `<li>${t}</li>`;
+                });
+                detailedHtml += '</ul></div>';
+            } else {
+                detailedHtml += '<div style="color: var(--text-muted); font-size: 0.875rem;">Not found in threat feeds</div>';
+            }
+            detailedHtml += '</div>';
+        }
+
+        detailedHtml += '</div></div></div>';
+        detailedDiv.innerHTML = detailedHtml;
+    }
+</script>
+{% endblock %}
