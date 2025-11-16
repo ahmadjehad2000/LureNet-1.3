@@ -2,12 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LureNet - Enterprise Threat Intelligence Platform</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="description" content="LureNet Enterprise Threat Intelligence Platform - Secure Login">
+    <meta name="author" content="LureNet Security">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Login - LureNet Enterprise Threat Intelligence Platform</title>
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body class="login-page">
     <!-- Background Animation -->
@@ -50,7 +60,7 @@
             {% endif %}
 
             <!-- Login Form -->
-            <form method="POST" action="/login" accept-charset="UTF-8" class="login-form">
+            <form method="POST" action="/login" accept-charset="UTF-8" class="login-form" aria-label="Login form" novalidate>
                 <div class="form-group">
                     <label for="username" class="form-label">
                         <svg class="form-icon" width="18" height="18" viewBox="0 0 20 20" fill="currentColor">

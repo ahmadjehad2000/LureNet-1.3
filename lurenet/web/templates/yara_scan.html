@@ -4,184 +4,89 @@
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">YARA Scanner</h1>
-    <p class="page-subtitle">Scan payloads and captured data with YARA rules for malware detection</p>
+    <h1 class="page-title">YARA Malware Scanner</h1>
+    <p class="page-subtitle">Scan data and files using YARA rules for malware detection</p>
 </div>
 
-<div class="grid-2">
-    <div class="card">
-        <div class="card-header">
-            <h3>Scan Data</h3>
-        </div>
-        <div class="card-body">
-            <form id="yara-form">
-                <div class="form-group">
-                    <label for="scan-input" class="form-label">Payload / Text / Code</label>
-                    <textarea id="scan-input" class="form-input" rows="8" placeholder="Paste payload, script, or any suspicious text..." required style="font-family: var(--font-mono); resize: vertical;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="name-input" class="form-label">Identifier (optional)</label>
-                    <input type="text" id="name-input" class="form-input" placeholder="Sample name or description">
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    <span>Scan with YARA</span>
-                </button>
-            </form>
-            <div id="scan-result" style="margin-top: 1.5rem;"></div>
-        </div>
+<div class="card">
+    <div class="card-header">
+        <h3>Scan Data with YARA</h3>
     </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3>Loaded YARA Rules</h3>
-        </div>
-        <div class="card-body">
-            <div id="yara-info" class="loading"><div class="loading-spinner"></div></div>
-        </div>
+    <div class="card-body">
+        <form id="yaraScanForm" accept-charset="UTF-8">
+            <div class="form-group">
+                <label for="dataInput" class="form-label">Data to Scan</label>
+                <textarea
+                    id="dataInput"
+                    name="data"
+                    class="form-input"
+                    rows="10"
+                    placeholder="Paste suspicious code, strings, or data here..."
+                    required
+                ></textarea>
+            </div>
+            <div class="form-group">
+                <label for="nameInput" class="form-label">Sample Name (optional)</label>
+                <input
+                    type="text"
+                    id="nameInput"
+                    name="name"
+                    class="form-input"
+                    placeholder="sample.txt"
+                >
+            </div>
+            <button type="submit" class="btn btn-primary">Scan with YARA</button>
+        </form>
+        <div id="scanResults" style="margin-top: 1.5rem; display: none;"></div>
     </div>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h3>Built-in Detection Capabilities</h3>
+        <h3>Loaded YARA Rules</h3>
     </div>
     <div class="card-body">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-            <div style="padding: 1rem; background: rgba(239, 68, 68, 0.05); border-left: 3px solid var(--danger); border-radius: 0.5rem;">
-                <h4 style="color: var(--danger); margin-bottom: 0.5rem;">Critical Threats</h4>
-                <ul style="color: var(--text-secondary); font-size: 0.875rem; list-style: none; padding: 0;">
-                    <li>• Reverse Shells</li>
-                    <li>• Webshells</li>
-                    <li>• Ransomware Indicators</li>
-                    <li>• CVE Exploits</li>
-                </ul>
-            </div>
-            <div style="padding: 1rem; background: rgba(245, 158, 11, 0.05); border-left: 3px solid var(--warning); border-radius: 0.5rem;">
-                <h4 style="color: var(--warning); margin-bottom: 0.5rem;">High Risk</h4>
-                <ul style="color: var(--text-secondary); font-size: 0.875rem; list-style: none; padding: 0;">
-                    <li>• SQL Injection</li>
-                    <li>• PowerShell Obfuscation</li>
-                    <li>• Credential Harvesting</li>
-                    <li>• Crypto Miners</li>
-                </ul>
-            </div>
-            <div style="padding: 1rem; background: rgba(59, 130, 246, 0.05); border-left: 3px solid var(--primary); border-radius: 0.5rem;">
-                <h4 style="color: var(--primary); margin-bottom: 0.5rem;">Medium Risk</h4>
-                <ul style="color: var(--text-secondary); font-size: 0.875rem; list-style: none; padding: 0;">
-                    <li>• XSS Payloads</li>
-                    <li>• Base64 Obfuscation</li>
-                    <li>• Suspicious Network Activity</li>
-                </ul>
-            </div>
-        </div>
+        <div id="rulesInfo">Loading rules information...</div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    // Load YARA info on page load
-    fetch('/api/yara/info')
-        .then(res => res.json())
-        .then(data => {
-            const infoDiv = document.getElementById('yara-info');
-            let html = '<div style="padding: 1rem; background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem;">';
-            html += `<div style="margin-bottom: 1rem;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--primary);">${data.total_rules}</div>
-                <div style="color: var(--text-muted); font-size: 0.875rem;">Total Rules Loaded</div>
-            </div>`;
-            html += `<div style="margin-bottom: 0.5rem;"><strong>Built-in Rules:</strong> ${data.builtin_rules}</div>`;
-            html += `<div style="margin-bottom: 1rem;"><strong>Custom Rules:</strong> ${data.custom_rules}</div>`;
+    // Load YARA rules info
+    async function loadRulesInfo() {
+        try {
+            const response = await fetch('/api/yara/info');
+            const data = await response.json();
+            document.getElementById('rulesInfo').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        } catch (error) {
+            document.getElementById('rulesInfo').innerHTML = '<div class="text-error">Error loading rules: ' + error.message + '</div>';
+        }
+    }
 
-            if (data.rule_categories && data.rule_categories.length > 0) {
-                html += '<h4 style="margin: 1rem 0 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">CATEGORIES</h4>';
-                html += '<ul style="list-style: none; padding: 0; margin: 0;">';
-                data.rule_categories.forEach(cat => {
-                    html += `<li style="padding: 0.25rem 0; color: var(--text-secondary); font-size: 0.875rem;">• ${cat}</li>`;
-                });
-                html += '</ul>';
-            }
-            html += '</div>';
-            infoDiv.innerHTML = html;
-        })
-        .catch(err => {
-            document.getElementById('yara-info').innerHTML = '<div class="alert alert-error">Failed to load rule info</div>';
-        });
-
-    // Scan form submission
-    document.getElementById('yara-form').addEventListener('submit', async (e) => {
+    // YARA scan
+    document.getElementById('yaraScanForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const data = document.getElementById('scan-input').value.trim();
-        const name = document.getElementById('name-input').value.trim() || 'scan';
-        const resultDiv = document.getElementById('scan-result');
+        const data = document.getElementById('dataInput').value;
+        const name = document.getElementById('nameInput').value || 'input';
+        const resultsDiv = document.getElementById('scanResults');
 
-        resultDiv.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+        resultsDiv.innerHTML = '<div class="loading">Scanning with YARA...</div>';
+        resultsDiv.style.display = 'block';
 
         try {
             const response = await fetch('/api/yara/scan', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({data: data, name: name})
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                body: JSON.stringify({ data, name })
             });
-
             const result = await response.json();
-            displayScanResult(result);
+            resultsDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
         } catch (error) {
-            resultDiv.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+            resultsDiv.innerHTML = '<div class="text-error">Error: ' + error.message + '</div>';
         }
     });
 
-    function displayScanResult(result) {
-        const resultDiv = document.getElementById('scan-result');
-        let html = '<div style="padding: 1rem; background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem;">';
-
-        html += `<div style="margin-bottom: 1rem;">
-            <span class="severity-badge severity-${result.severity}">
-                ${result.severity.toUpperCase()}
-            </span>
-            <span style="margin-left: 1rem; color: var(--text-secondary);">Threat Score: ${result.threat_score}/100</span>
-        </div>`;
-
-        html += '<div style="margin-bottom: 1rem;">';
-        html += `<div><strong>Identifier:</strong> ${result.identifier}</div>`;
-        html += `<div><strong>Data Size:</strong> ${result.size} bytes</div>`;
-        html += `<div><strong>Rules Matched:</strong> ${result.matched_rules}</div>`;
-        html += '</div>';
-
-        if (result.matches && result.matches.length > 0) {
-            html += '<h4 style="margin: 1rem 0 0.5rem;">Matched Rules</h4>';
-            result.matches.forEach(match => {
-                const severity = match.meta.severity || 'medium';
-                const severityColor = severity === 'critical' ? '#ef4444' :
-                                     severity === 'high' ? '#f59e0b' :
-                                     severity === 'medium' ? '#3b82f6' : '#10b981';
-
-                html += `<div style="padding: 0.75rem; background: rgba(15, 23, 42, 0.5); border-left: 3px solid ${severityColor}; border-radius: 0.375rem; margin-bottom: 0.5rem;">`;
-                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">`;
-                html += `<strong style="color: var(--text-primary);">${match.rule}</strong>`;
-                html += `<span class="severity-badge severity-${severity}" style="font-size: 0.625rem;">${severity}</span>`;
-                html += `</div>`;
-
-                if (match.meta.description) {
-                    html += `<div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">${match.meta.description}</div>`;
-                }
-
-                if (match.strings && match.strings.length > 0) {
-                    html += `<div style="color: var(--text-muted); font-size: 0.75rem;">`;
-                    html += `Matched ${match.strings.length} pattern(s)`;
-                    html += `</div>`;
-                }
-                html += '</div>';
-            });
-        } else {
-            html += '<div style="padding: 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.5rem; margin-top: 1rem;">';
-            html += '<strong style="color: #6ee7b7;">Clean</strong><br>';
-            html += '<span style="color: var(--text-muted); font-size: 0.875rem;">No suspicious patterns detected</span>';
-            html += '</div>';
-        }
-
-        html += '</div>';
-        resultDiv.innerHTML = html;
-    }
+    loadRulesInfo();
 </script>
 {% endblock %}
