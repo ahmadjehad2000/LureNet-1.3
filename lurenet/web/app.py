@@ -24,20 +24,39 @@ def create_app(engine):
     app = Flask(__name__)
 
     # Configuration - Use Flask's built-in cookie sessions
-    app.config['SECRET_KEY'] = engine.config.get(
-        'dashboard.secret_key',
-        secrets.token_hex(32)
-    )
+    # Generate a stable secret key (same key each time for session persistence)
+    secret_key = engine.config.get('dashboard.secret_key')
+    if not secret_key:
+        # Use a consistent secret key based on config
+        secret_key = secrets.token_hex(32)
+        app.logger.warning("Using auto-generated SECRET_KEY - set dashboard.secret_key in config for persistence")
+
+    app.config['SECRET_KEY'] = secret_key
+
     # Session configuration
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
     app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_NAME'] = 'lurenet_session'
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
     app.config['JSON_AS_ASCII'] = False  # Support UTF-8 in JSON responses
 
-    # Initialize SocketIO with gevent
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+    # Disable session modification tracking for better compatibility
+    app.config['SESSION_COOKIE_DOMAIN'] = None
+    app.config['APPLICATION_ROOT'] = '/'
+
+    # Initialize SocketIO with threading mode (more reliable than gevent)
+    # Threading mode is the recommended option as of 2025
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='threading',
+        logger=True,
+        engineio_logger=False,
+        ping_timeout=60,
+        ping_interval=25
+    )
 
     # Store engine reference
     app.engine = engine
@@ -66,42 +85,48 @@ def create_app(engine):
     def login():
         """Login page"""
         # If already logged in, redirect to dashboard
-        if session.get('logged_in'):
+        if session.get('logged_in') == True:
             app.logger.info(f"User {session.get('username')} already logged in, redirecting to dashboard")
             return redirect(url_for('dashboard'))
 
+        error = None
         if request.method == 'POST':
             username = request.form.get('username', '').strip()
-            password = request.form.get('password', '')
+            password = request.form.get('password', '').strip()
 
             # Get credentials from config
             admin_user = engine.config.get('dashboard.admin_username', 'admin')
             admin_pass = engine.config.get('dashboard.admin_password', 'LureNet2024!')
 
-            # Debug logging
-            app.logger.info(f"Login attempt - Username: '{username}', Expected: '{admin_user}'")
-            app.logger.debug(f"Password length: {len(password)}, Expected length: {len(admin_pass)}")
+            # Log login attempt (without sensitive info in production)
+            app.logger.info(f"Login attempt for username: '{username}'")
 
-            if username == admin_user and password == admin_pass:
-                # Clear session and set new data
+            # Validate credentials
+            if username and password and username == admin_user and password == admin_pass:
+                # Clear any existing session data
                 session.clear()
+
+                # Set session as permanent (uses PERMANENT_SESSION_LIFETIME)
                 session.permanent = True
+
+                # Set authentication flags
                 session['logged_in'] = True
                 session['username'] = username
+                session['login_time'] = datetime.utcnow().isoformat()
 
-                app.logger.info(f"✓ Successful login for user: {username}, Session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
-                app.logger.info(f"Session data after login: {dict(session)}")
+                # Force session to be saved
+                session.modified = True
 
-                return redirect(url_for('dashboard'))
+                app.logger.info(f"✓ Successful login for user: {username}")
+
+                # Redirect to dashboard
+                response = redirect(url_for('dashboard'))
+                return response
             else:
-                app.logger.warning(f"✗ Failed login attempt - Username: '{username}'")
-                if username != admin_user:
-                    app.logger.warning(f"  Username mismatch: got '{username}', expected '{admin_user}'")
-                if password != admin_pass:
-                    app.logger.warning(f"  Password mismatch")
-                return render_template('login.html', error='Invalid username or password')
+                error = 'Invalid username or password. Please try again.'
+                app.logger.warning(f"✗ Failed login attempt for username: '{username}'")
 
-        return render_template('login.html')
+        return render_template('login.html', error=error)
 
     @app.route('/logout')
     def logout():

@@ -1,17 +1,17 @@
 # LureNet Enterprise v2.0 - Professional Honeypot Platform
-# Python 3.8-3.13 Required
+# Python 3.9+ Required (Updated January 2025)
 
 # ============================================================================
-# Web Framework & Server
+# Web Framework & Server (Latest Stable - Jan 2025)
 # ============================================================================
-Flask==3.0.3
-Flask-SocketIO==5.3.6
+Flask==3.1.2
+Flask-SocketIO==5.5.1
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
-Werkzeug==3.0.3
-gevent==24.2.1
+Werkzeug==3.1.3
+# Using threading mode for SocketIO (no gevent/eventlet needed)
 simple-websocket==1.1.0
-python-socketio==5.11.2
+python-socketio==5.12.0
 
 # ============================================================================
 # Database & ORM
@@ -45,15 +45,15 @@ aiosmtpd==1.4.6
 # DNS
 dnspython==2.7.0
 dnslib==0.9.25
-# SMB (optional)
-pysmb==1.2.9.1
+# SMB (optional - may fail on some systems, can be skipped)
+# pysmb==1.2.9.1
 
 # ============================================================================
 # Threat Intelligence & Analysis
 # ============================================================================
-# GeoIP
-geoip2==4.8.1
-maxminddb==2.6.2
+# GeoIP (optional)
+# geoip2==4.8.1
+# maxminddb==2.6.2
 # Malware Analysis
 yara-python==4.5.1
 pefile==2024.8.26
