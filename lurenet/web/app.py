@@ -133,6 +133,24 @@ def create_app(engine):
         """Analytics page"""
         return render_template('analytics.html', username=session.get('username'))
 
+    @app.route('/intelligence')
+    @login_required
+    def intelligence():
+        """Threat Intelligence page"""
+        return render_template('intelligence.html', username=session.get('username'))
+
+    @app.route('/yara_scan')
+    @login_required
+    def yara_scan():
+        """YARA Scanner page"""
+        return render_template('yara_scan.html', username=session.get('username'))
+
+    @app.route('/ip_lookup')
+    @login_required
+    def ip_lookup():
+        """IP Lookup page"""
+        return render_template('ip_lookup.html', username=session.get('username'))
+
     # API Routes
     @app.route('/api/statistics')
     @login_required
@@ -163,6 +181,114 @@ def create_app(engine):
             status = engine.get_handler_status()
             return jsonify({'services': status, 'running': engine.is_running()})
         except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # Analysis API Routes
+    @app.route('/api/intel/hash', methods=['POST'])
+    @login_required
+    def api_analyze_hash():
+        """Analyze hash via threat intelligence"""
+        try:
+            from lurenet.analysis import ThreatIntelligence
+
+            data = request.get_json()
+            file_hash = data.get('hash', '').strip()
+
+            if not file_hash:
+                return jsonify({'error': 'Hash required'}), 400
+
+            intel = ThreatIntelligence()
+            result = intel.analyze_hash(file_hash)
+            return jsonify(result)
+        except Exception as e:
+            app.logger.error(f"Hash analysis error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/intel/url', methods=['POST'])
+    @login_required
+    def api_analyze_url():
+        """Analyze URL via threat intelligence"""
+        try:
+            from lurenet.analysis import ThreatIntelligence
+
+            data = request.get_json()
+            url = data.get('url', '').strip()
+
+            if not url:
+                return jsonify({'error': 'URL required'}), 400
+
+            intel = ThreatIntelligence()
+            result = intel.analyze_url(url)
+            return jsonify(result)
+        except Exception as e:
+            app.logger.error(f"URL analysis error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/yara/scan', methods=['POST'])
+    @login_required
+    def api_yara_scan():
+        """Scan data with YARA rules"""
+        try:
+            from lurenet.analysis import YARAScanner
+
+            data = request.get_json()
+            scan_data = data.get('data', '').strip()
+
+            if not scan_data:
+                return jsonify({'error': 'Data required'}), 400
+
+            scanner = YARAScanner()
+            result = scanner.scan_string(scan_data, identifier=data.get('name', 'input'))
+            return jsonify(result)
+        except Exception as e:
+            app.logger.error(f"YARA scan error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/yara/info', methods=['GET'])
+    @login_required
+    def api_yara_info():
+        """Get YARA rule information"""
+        try:
+            from lurenet.analysis import YARAScanner
+
+            scanner = YARAScanner()
+            info = scanner.get_rule_info()
+            return jsonify(info)
+        except Exception as e:
+            app.logger.error(f"YARA info error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/ip/lookup', methods=['POST'])
+    @login_required
+    def api_ip_lookup():
+        """Lookup IP address"""
+        try:
+            from lurenet.analysis import IPReputation
+
+            data = request.get_json()
+            ip_address = data.get('ip', '').strip()
+
+            if not ip_address:
+                return jsonify({'error': 'IP address required'}), 400
+
+            ip_rep = IPReputation()
+            result = ip_rep.lookup(ip_address)
+            return jsonify(result)
+        except Exception as e:
+            app.logger.error(f"IP lookup error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/attacker/ips', methods=['GET'])
+    @login_required
+    def api_attacker_ips():
+        """Get list of attacking IPs from database"""
+        try:
+            # Get unique attacker IPs from recent events
+            events = engine.get_recent_events(1000)
+            ips = list(set([e.get('source_ip') for e in events if e.get('source_ip')]))
+            return jsonify({'ips': ips[:100]})  # Limit to 100 most recent
+        except Exception as e:
+            app.logger.error(f"Attacker IPs error: {e}")
             return jsonify({'error': str(e)}), 500
 
     # WebSocket events
